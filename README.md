@@ -91,7 +91,7 @@ bash scripts/build-app.sh
 
 The eight Swift Testing tests cover empty/single-window cases, duplicate entries, forward and backward cycling, enumeration changes, delayed focus reports, Option release, application changes, and windows being opened or closed.
 
-The app has been built and launched on macOS 27.0.1. Shortcut registration has been checked, and the diagnostic command has switched between two blank Word documents in both directions and performed no operation with one document window. Physical keyboard input and the full hold-Option workflow still need manual verification.
+The app has been built and launched on macOS 27.0.1. Shortcut registration has been checked, and the diagnostic command has switched between two blank Word documents in both directions and performed no operation with one document window. The user has also confirmed that pressing Option + Tab on a physical keyboard switches between Word document windows. Reverse switching with physical keys and the full hold-Option workflow still need manual verification.
 
 Quit the running app before checking shortcut registration:
 
