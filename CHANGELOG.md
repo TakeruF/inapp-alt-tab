@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1 — 2026-10-12
+
+- Add Developer ID Application signing with Hardened Runtime and a secure timestamp for release builds.
+- Add Apple notarization through an existing Xcode developer account or a notarytool Keychain profile.
+- Validate the notarization ticket and Gatekeeper acceptance before creating the universal release ZIP and SHA-256 checksum.
+- Preserve ad hoc signing for local source builds.
+
 ## 1.1.0 — 2026-10-12
 
 - Add Japanese, English, Chinese (Simplified and Traditional), and Korean throughout the setup window, menu bar, permission guidance, errors, and diagnostics.

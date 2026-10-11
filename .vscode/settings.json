@@ -1,0 +1,15 @@
+{
+    "workbench.colorCustomizations": {
+        "glaze.active": "Monokai",
+        "[Monokai]": {
+            "titleBar.activeBackground": "#542f62",
+            "titleBar.activeForeground": "#edebec",
+            "titleBar.inactiveBackground": "#412a4a",
+            "titleBar.inactiveForeground": "#cac5c9",
+            "statusBar.background": "#633d72",
+            "statusBar.foreground": "#edebec",
+            "activityBar.background": "#3f2948",
+            "activityBar.foreground": "#e5e2e4"
+        }
+    }
+}

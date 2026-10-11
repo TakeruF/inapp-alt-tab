@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:inapp-alt-tab}",
+            "name": "Debug InAppAltTab",
+            "target": "InAppAltTab",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug InAppAltTab"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:inapp-alt-tab}",
+            "name": "Release InAppAltTab",
+            "target": "InAppAltTab",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release InAppAltTab"
+        }
+    ]
+}

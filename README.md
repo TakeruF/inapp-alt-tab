@@ -21,7 +21,9 @@ Download the universal ZIP from the [latest GitHub release](https://github.com/T
 3. In **System Settings → Privacy & Security → Accessibility**, enable **InApp Alt Tab**. If the app is missing, use the **+** button to add it.
 4. Open multiple windows in the same application and press **Option + Tab**.
 
-The app is ad hoc signed and is not notarized. macOS may require approval for the first launch of a downloaded copy under **System Settings → Privacy & Security**.
+Starting with 1.1.1, release builds use Developer ID Application signing and Apple notarization. macOS may ask you to confirm the first launch. Accessibility permission is still required to switch windows.
+
+Older releases and default local source builds are ad hoc signed without notarization. macOS may require approval for those copies under **System Settings → Privacy & Security**. When upgrading from an ad hoc build, you may need to remove the old Accessibility entry and grant permission to the signed copy.
 
 Each release includes `SHA256SUMS.txt` to verify the downloaded ZIP:
 
@@ -50,7 +52,7 @@ open "dist/InApp Alt Tab.app"
 
 Closing the setup window leaves the app running in the menu bar.
 
-Builds use a local ad hoc signature. Developer ID signing and notarization are not provided. To choose a different output directory, pass its path to the build script:
+Source builds use a local ad hoc signature by default. To choose a different output directory, pass its path to the build script:
 
 ```sh
 bash scripts/build-app.sh /path/to/output
@@ -61,6 +63,28 @@ To build the universal app used for releases:
 ```sh
 bash scripts/build-app.sh --universal
 ```
+
+## Signed and notarized releases
+
+Release signing requires a **Developer ID Application** certificate and its private key in your local Keychain. List usable identities with `security find-identity -v -p codesigning`.
+
+```sh
+export DEVELOPER_ID_APPLICATION='Developer ID Application: Your Name (TEAMID)'
+bash scripts/release.sh prepare
+bash scripts/release.sh finish
+```
+
+`prepare` runs the tests, builds both architectures, enables Hardened Runtime, signs with a secure timestamp, and submits to Apple using the developer account already configured in Xcode. `finish` exports the notarized app, validates its attached ticket and Gatekeeper acceptance, and creates `dist/<version>/InApp-Alt-Tab-<version>-universal.zip` and `SHA256SUMS.txt`. If Apple is still processing, rerun `finish` later. Keep the submitted archive until completion; `prepare` refuses to overwrite it.
+
+For `notarytool` instead of Xcode account authentication, securely save credentials with `xcrun notarytool store-credentials`, then set `NOTARY_KEYCHAIN_PROFILE` to that profile's name for both commands. Passwords and API keys must stay out of the repository and command history. The notarytool path retains Apple's submission status and log in the release directory.
+
+To build a signed app without submitting it for notarization:
+
+```sh
+bash scripts/build-app.sh --universal --sign "$DEVELOPER_ID_APPLICATION" dist/signed
+```
+
+Signing alone does not notarize the app. Publish the ZIP produced by `finish`, which packages the app after its notarization ticket is attached. The release does not enable App Sandbox because window switching uses the Accessibility API.
 
 ## App language
 
@@ -127,6 +151,8 @@ The eight window-cycle tests cover empty/single-window cases, duplicate entries,
 The app has been built and launched on macOS 27.0.1. Shortcut registration has been checked, and the diagnostic command has switched between two blank Word documents in both directions and performed no operation with one document window. The user has also confirmed that pressing Option + Tab on a physical keyboard switches between Word document windows. Reverse switching with physical keys and the full hold-Option workflow still need manual verification.
 
 For 1.1.0, packaged translations, localized permission descriptions, regional selection, and English fallback were checked. Setup windows were visually checked in all five locales on Apple Silicon.
+
+For 1.1.1, all 13 tests pass. The extracted universal release ZIP was checked for Developer ID signing, Hardened Runtime, and secure timestamps in both architectures, a valid attached notarization ticket, and Gatekeeper acceptance as `Notarized Developer ID`. The signed app launches on Apple Silicon with switching enabled, and both shortcuts register successfully. Intel runtime behavior and physical-key reverse/hold-Option cycling remain unverified.
 
 Quit the running app before checking shortcut registration:
 

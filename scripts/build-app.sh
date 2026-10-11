@@ -2,18 +2,31 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 universal=false
-if [[ "${1:-}" == "--universal" ]]; then
-    universal=true
-    shift
-fi
+signing_identity="-"
+while [[ "${1:-}" == --* ]]; do
+    case "$1" in
+        --universal) universal=true; shift ;;
+        --sign)
+            if [[ $# -lt 2 || -z "$2" || "$2" == -* ]]; then
+                printf 'Error: --sign requires a Developer ID Application identity.\n' >&2
+                exit 2
+            fi
+            signing_identity="$2"
+            shift 2
+            ;;
+        *) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
+    esac
+done
 if [[ $# -gt 1 ]]; then
-    printf 'Usage: %s [--universal] [output-directory]\n' "$0" >&2
+    printf 'Usage: %s [--universal] [--sign identity] [output-directory]\n' "$0" >&2
     exit 2
 fi
 output_dir="${1:-$PWD/dist}"
 mkdir -p "$output_dir"
 output_dir="$(cd "$output_dir" && pwd)"
-app="$output_dir/InApp Alt Tab.app"
+staging_dir="$(mktemp -d "$output_dir/.build-app.XXXXXX")"
+trap 'rm -rf "$staging_dir"' EXIT
+app="$staging_dir/InApp Alt Tab.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 if "$universal"; then
     binaries=()
@@ -35,7 +48,20 @@ ditto "$binary_dir/InAppAltTab_AppLocalization.bundle" "$app/Contents/Resources/
 for localization in Resources/*.lproj; do
     ditto "$localization" "$app/Contents/Resources/$(basename "$localization")"
 done
-codesign --force --sign - --identifier dev.takeruf.inapp-alt-tab \
-    --requirements '=designated => identifier "dev.takeruf.inapp-alt-tab"' "$app"
+if [[ "$signing_identity" == "-" ]]; then
+    codesign --force --sign - --identifier dev.takeruf.inapp-alt-tab \
+        --requirements '=designated => identifier "dev.takeruf.inapp-alt-tab"' "$app"
+else
+    # Keep the certificate-derived designated requirement for stable TCC identity.
+    codesign --force --sign "$signing_identity" --options runtime --timestamp "$app"
+    signature="$(codesign --display --verbose=4 "$app" 2>&1)"
+    if [[ "$signature" != *"Authority=Developer ID Application:"* ]]; then
+        printf 'Error: release signing requires a Developer ID Application certificate.\n' >&2
+        exit 1
+    fi
+fi
 codesign --verify --strict "$app"
+rm -rf "$output_dir/InApp Alt Tab.app"
+mv "$app" "$output_dir/InApp Alt Tab.app"
+app="$output_dir/InApp Alt Tab.app"
 printf 'Built: %s\n' "$app"
