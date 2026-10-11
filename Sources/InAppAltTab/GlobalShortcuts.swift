@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import AppLocalization
 
 final class GlobalShortcuts {
     private var handler: EventHandlerRef?
@@ -30,7 +31,7 @@ final class GlobalShortcuts {
             return noErr
         }, 1, &event, context, &handler)
         guard status == noErr else {
-            failure = "ショートカットの準備に失敗しました（\(status)）。"
+            failure = L10n.format(.shortcutHandlerFailure, status)
             stop()
             return
         }
@@ -40,7 +41,7 @@ final class GlobalShortcuts {
                                              EventHotKeyID(signature: 0x49415442, id: id),
                                              GetApplicationEventTarget(), 0, &reference)
             guard result == noErr, let reference else {
-                failure = "Option＋Tab を登録できません。AltTabなど、同じキーを使うアプリを確認してください（\(result)）。"
+                failure = L10n.format(.shortcutRegistrationFailure, result)
                 stop()
                 return
             }

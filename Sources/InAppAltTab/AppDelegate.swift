@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import ServiceManagement
+import AppLocalization
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let switcher = WindowSwitcher()
@@ -24,7 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshPermission() }
         }
-        if !AXIsProcessTrusted() || !UserDefaults.standard.bool(forKey: "hasLaunched") { showSetup() }
+        if !AXIsProcessTrusted() || !UserDefaults.standard.bool(forKey: "hasLaunched")
+            || CommandLine.arguments.contains("--show-setup") { showSetup() }
         UserDefaults.standard.set(true, forKey: "hasLaunched")
     }
 
@@ -47,7 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func createStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: "InApp Alt Tab")
-        item.button?.toolTip = "InApp Alt Tab — 同じアプリのウィンドウを切り替え"
+        item.button?.toolTip = L10n.text(.appTooltip)
         let menu = NSMenu()
         menu.delegate = self
         item.menu = menu
@@ -60,16 +62,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let status = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
-        let keys = NSMenuItem(title: "⌥ Tab：次へ  ／  ⌥ ⇧ Tab：前へ", action: nil, keyEquivalent: "")
+        let keys = NSMenuItem(title: L10n.text(.shortcutSummary), action: nil, keyEquivalent: "")
         keys.isEnabled = false
         menu.addItem(keys)
         menu.addItem(.separator())
-        addItem("ウィンドウ切り替えを有効にする", action: #selector(toggleEnabled), to: menu).state = enabled ? .on : .off
-        addItem("使い方・権限設定…", action: #selector(showSetup), to: menu)
-        let login = addItem("ログイン時に起動", action: #selector(toggleLaunchAtLogin), to: menu)
+        addItem(L10n.text(.enableSwitching), action: #selector(toggleEnabled), to: menu).state = enabled ? .on : .off
+        addItem(L10n.text(.setupMenu), action: #selector(showSetup), to: menu)
+        let login = addItem(L10n.text(.launchAtLogin), action: #selector(toggleLaunchAtLogin), to: menu)
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(.separator())
-        addItem("InApp Alt Tab を終了", action: #selector(quit), to: menu)
+        addItem(L10n.text(.quit), action: #selector(quit), to: menu)
     }
 
     @discardableResult private func addItem(_ title: String, action: Selector, to menu: NSMenu) -> NSMenuItem {
@@ -80,10 +82,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private var statusText: String {
-        if !AXIsProcessTrusted() { return "アクセシビリティの許可が必要です" }
-        if !enabled { return "ウィンドウ切り替え：一時停止中" }
+        if !AXIsProcessTrusted() { return L10n.text(.permissionRequired) }
+        if !enabled { return L10n.text(.switchingPaused) }
         if let failure = shortcuts.failure { return failure }
-        return shortcuts.isRegistered ? "ウィンドウ切り替え：有効" : "ショートカットを準備しています"
+        return L10n.text(shortcuts.isRegistered ? .switchingEnabled : .preparingShortcuts)
     }
 
     private func refreshPermission() {
@@ -128,8 +130,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             else { try SMAppService.mainApp.register() }
         } catch {
             let alert = NSAlert()
-            alert.messageText = "ログイン時の起動設定を変更できませんでした"
-            alert.informativeText = "アプリをアプリケーションフォルダに置いてから試してください。\n\(error.localizedDescription)"
+            alert.messageText = L10n.text(.loginFailureTitle)
+            alert.informativeText = L10n.format(.loginFailureDetail, error.localizedDescription)
+            alert.addButton(withTitle: L10n.text(.ok))
             alert.runModal()
         }
     }

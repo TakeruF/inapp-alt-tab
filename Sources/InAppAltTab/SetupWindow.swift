@@ -1,12 +1,14 @@
 import AppKit
+import AppLocalization
 
 final class SetupWindow: NSWindowController {
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
-    private let permissionButton = NSButton(title: "アクセシビリティ設定を開く", target: nil, action: nil)
+    private let permissionButton = NSButton(title: L10n.text(.permissionOpen), target: nil, action: nil)
+    private var contentStack: NSStackView?
     var onRequestPermission: (() -> Void)?
 
     init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 470, height: 410),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 480),
                               styleMask: [.titled, .closable, .miniaturizable],
                               backing: .buffered, defer: false)
         window.title = "InApp Alt Tab"
@@ -25,21 +27,22 @@ final class SetupWindow: NSWindowController {
     }
 
     func update(status: String, trusted: Bool) {
+        let changed = statusLabel.stringValue != status
         statusLabel.stringValue = status
         statusLabel.textColor = trusted ? .labelColor : .secondaryLabelColor
-        permissionButton.title = trusted ? "アクセシビリティ設定を確認" : "アクセシビリティ設定を開く"
+        permissionButton.title = L10n.text(trusted ? .permissionReview : .permissionOpen)
+        if changed { fitContent() }
     }
 
     private func buildContent(_ window: NSWindow) {
         guard let content = window.contentView else { return }
         let image = NSImageView()
-        image.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: nil)
+        image.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: L10n.text(.windowIcon))
         image.contentTintColor = .controlAccentColor
         image.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 34, weight: .medium)
-        let title = NSTextField(labelWithString: "いまのアプリ内で、すぐ切り替え。")
+        let title = NSTextField(wrappingLabelWithString: L10n.text(.setupTitle))
         title.font = .systemFont(ofSize: 20, weight: .semibold)
-        let description = NSTextField(wrappingLabelWithString:
-            "Option（Alt）＋Tab で次のウィンドウへ。\nShift を加えると逆方向に切り替えます。\nOption を押したまま Tab を繰り返すと順番に巡回します。")
+        let description = NSTextField(wrappingLabelWithString: L10n.text(.setupInstructions))
         description.font = .systemFont(ofSize: 13)
         description.textColor = .secondaryLabelColor
         let shortcut = NSTextField(labelWithString: "⌥ Tab     /     ⌥ ⇧ Tab")
@@ -48,22 +51,34 @@ final class SetupWindow: NSWindowController {
         permissionButton.target = self
         permissionButton.action = #selector(requestPermission)
         permissionButton.bezelStyle = .rounded
-        let footnote = NSTextField(wrappingLabelWithString:
-            "設定で「InApp Alt Tab」をオンにしてください。\nウィンドウが1つのときは何もしません。この画面を閉じてもメニューバーに常駐します。")
+        let footnote = NSTextField(wrappingLabelWithString: L10n.text(.setupFootnote))
         footnote.font = .systemFont(ofSize: 11)
         footnote.textColor = .secondaryLabelColor
         let stack = NSStackView(views: [image, title, description, shortcut, statusLabel, permissionButton, footnote])
+        contentStack = stack
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 16
         stack.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(stack)
+        for label in [title, description, statusLabel, footnote] {
+            label.preferredMaxLayoutWidth = 460
+            label.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 30),
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -30),
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 25),
             stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -25)
         ])
+        fitContent()
+    }
+
+    private func fitContent() {
+        guard let window, let content = window.contentView, let contentStack else { return }
+        content.layoutSubtreeIfNeeded()
+        let height = max(410, ceil(contentStack.fittingSize.height) + 50)
+        window.setContentSize(NSSize(width: 520, height: height))
     }
 
     @objc private func requestPermission() { onRequestPermission?() }

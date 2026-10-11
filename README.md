@@ -48,7 +48,7 @@ You can also launch a development build directly:
 open "dist/InApp Alt Tab.app"
 ```
 
-The setup window and menu currently use Japanese text. Closing the setup window leaves the app running in the menu bar.
+Closing the setup window leaves the app running in the menu bar.
 
 Builds use a local ad hoc signature. Developer ID signing and notarization are not provided. To choose a different output directory, pass its path to the build script:
 
@@ -61,6 +61,19 @@ To build the universal app used for releases:
 ```sh
 bash scripts/build-app.sh --universal
 ```
+
+## App language
+
+The setup window, menu bar, permission guidance, errors, and diagnostic messages support:
+
+- English
+- Japanese
+- Chinese (Simplified and Traditional)
+- Korean
+
+The app follows the preferred language order in macOS, including per-app language settings. If no supported language matches, it uses English. To choose a language just for this app, add **InApp Alt Tab** under **System Settings → General → Language & Region → Applications**, choose the language, and restart the app. This does not change the language of other applications.
+
+Translation resources are included in the app bundle, so downloaded copies work without the source repository.
 
 ## Shortcuts
 
@@ -109,9 +122,11 @@ swift test
 bash scripts/build-app.sh
 ```
 
-The eight Swift Testing tests cover empty/single-window cases, duplicate entries, forward and backward cycling, enumeration changes, delayed focus reports, Option release, application changes, and windows being opened or closed.
+The eight window-cycle tests cover empty/single-window cases, duplicate entries, forward and backward cycling, enumeration changes, delayed focus reports, Option release, application changes, and windows being opened or closed. Five localization tests cover complete translations, regional language matching, preference order, English fallback, Chinese script variants, and formatted error details.
 
 The app has been built and launched on macOS 27.0.1. Shortcut registration has been checked, and the diagnostic command has switched between two blank Word documents in both directions and performed no operation with one document window. The user has also confirmed that pressing Option + Tab on a physical keyboard switches between Word document windows. Reverse switching with physical keys and the full hold-Option workflow still need manual verification.
+
+For 1.1.0, packaged translations, localized permission descriptions, regional selection, and English fallback were checked. Setup windows were visually checked in all five locales on Apple Silicon.
 
 Quit the running app before checking shortcut registration:
 
@@ -129,11 +144,19 @@ To test window operations separately from keyboard delivery, keep the target app
 
 Running these commands from a foreground terminal makes the terminal itself the target. The diagnostic prints the frontmost application's bundle identifier and whether a window operation was performed.
 
+To inspect packaged translations without changing saved language settings:
+
+```sh
+"dist/InApp Alt Tab.app/Contents/MacOS/InAppAltTab" --dump-localization -AppleLanguages '(ko)'
+```
+
+Replace `ko` with `en`, `ja`, `zh-Hans`, or `zh-Hant`. The report includes the selected language, resource bundle path, and translated strings. For a temporary setup preview, launch the app with `--show-setup` and the same language argument after quitting any running copy.
+
 ## Implementation
 
 The app uses Swift, AppKit, ApplicationServices, Carbon, and ServiceManagement. Global shortcuts are registered with Carbon. Accessibility windows are enumerated for the frontmost process and raised with `AXRaise`, followed by writable focus attributes. The frontmost process is checked again before acting.
 
-`WindowCycle` contains the window-order logic and its tests. The executable target contains shortcut handling, window operations, setup, and menu bar controls. `scripts/build-app.sh` creates and signs the app bundle and includes the license in its resources.
+`WindowCycle` contains the window-order logic and its tests. `AppLocalization` contains native localized string resources and language-selection tests. The executable target contains shortcut handling, window operations, setup, and menu bar controls. `scripts/build-app.sh` creates and signs the app bundle and includes the license and all localization resources.
 
 ## Acknowledgments
 

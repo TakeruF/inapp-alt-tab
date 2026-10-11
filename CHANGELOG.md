@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 — 2026-10-12
+
+- Add Japanese, English, Chinese (Simplified and Traditional), and Korean throughout the setup window, menu bar, permission guidance, errors, and diagnostics.
+- Follow macOS preferred languages and per-app language settings, with English fallback.
+- Bundle all translations in both Universal and native builds.
+- Allow the setup window to wrap translated text and fit longer messages.
+- Add localization coverage for missing strings, regional preferences, Chinese script selection, fallback, and formatted error details.
+
 ## 1.0.0 — 2026-10-12
 
 First public release.

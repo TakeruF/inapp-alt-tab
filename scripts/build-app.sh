@@ -31,6 +31,10 @@ else
 fi
 cp Resources/Info.plist "$app/Contents/Info.plist"
 cp LICENSE "$app/Contents/Resources/LICENSE"
+ditto "$binary_dir/InAppAltTab_AppLocalization.bundle" "$app/Contents/Resources/InAppAltTab_AppLocalization.bundle"
+for localization in Resources/*.lproj; do
+    ditto "$localization" "$app/Contents/Resources/$(basename "$localization")"
+done
 codesign --force --sign - --identifier dev.takeruf.inapp-alt-tab \
     --requirements '=designated => identifier "dev.takeruf.inapp-alt-tab"' "$app"
 codesign --verify --strict "$app"
