@@ -10,9 +10,28 @@ For example, if you have multiple Word documents open in separate windows, you c
 - Accessibility permission to control application windows.
 - Xcode or Command Line Tools with Swift 6.2 or later to build from source.
 
-There are no third-party package dependencies. The build script produces an app for the architecture of the Mac running the build; the initial build was tested on Apple Silicon.
+There are no third-party package dependencies. GitHub releases provide a universal app for Apple Silicon and Intel Macs. Runtime behavior has been tested on Apple Silicon; Intel execution has not been verified. The default source build targets the architecture of the Mac running the build.
 
-## Build and install
+## Download and install
+
+Download the universal ZIP from the [latest GitHub release](https://github.com/TakeruF/inapp-alt-tab/releases/latest), extract it, and move **InApp Alt Tab.app** to your Applications folder.
+
+1. Launch **InApp Alt Tab.app**.
+2. Use the Accessibility settings button in the setup window.
+3. In **System Settings → Privacy & Security → Accessibility**, enable **InApp Alt Tab**. If the app is missing, use the **+** button to add it.
+4. Open multiple windows in the same application and press **Option + Tab**.
+
+The app is ad hoc signed and is not notarized. macOS may require approval for the first launch of a downloaded copy under **System Settings → Privacy & Security**.
+
+Each release includes `SHA256SUMS.txt` to verify the downloaded ZIP:
+
+```sh
+shasum -a 256 -c SHA256SUMS.txt
+```
+
+Run the command in the folder containing both downloaded files.
+
+## Build from source
 
 ```sh
 git clone https://github.com/TakeruF/inapp-alt-tab.git
@@ -21,12 +40,7 @@ swift test
 bash scripts/build-app.sh
 ```
 
-The app is created at `dist/InApp Alt Tab.app`.
-
-1. Move **InApp Alt Tab.app** to your Applications folder and launch it.
-2. Use the Accessibility settings button in the setup window.
-3. In **System Settings → Privacy & Security → Accessibility**, enable **InApp Alt Tab**. If the app is missing, use the **+** button to add it.
-4. Open multiple windows in the same application and press **Option + Tab**.
+The app is created at `dist/InApp Alt Tab.app`. Follow the installation and permission steps above.
 
 You can also launch a development build directly:
 
@@ -36,10 +50,16 @@ open "dist/InApp Alt Tab.app"
 
 The setup window and menu currently use Japanese text. Closing the setup window leaves the app running in the menu bar.
 
-Builds use a local ad hoc signature. Developer ID signing, notarization, and a public binary release are not provided. To choose a different output directory, pass its path to the build script:
+Builds use a local ad hoc signature. Developer ID signing and notarization are not provided. To choose a different output directory, pass its path to the build script:
 
 ```sh
 bash scripts/build-app.sh /path/to/output
+```
+
+To build the universal app used for releases:
+
+```sh
+bash scripts/build-app.sh --universal
 ```
 
 ## Shortcuts
