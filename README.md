@@ -134,7 +134,7 @@ Accessibility permission is used to enumerate and focus windows and observe Opti
 
 There are no previews, screenshots, screen recording, or network requests. Screen Recording permission is not needed. Local preferences store pause state and whether setup has been shown. Operational errors may be recorded in the macOS system log without window titles or document contents.
 
-WindowServer metadata is used only to match window IDs, process IDs, and window levels for cross-Space discovery. Window images are not captured; window titles are not used or stored.
+WindowServer metadata is used only to match window IDs and process IDs for cross-Space discovery. All stacking layers are included because full-screen windows can use nonzero layers; Accessibility roles and subroles determine which windows are eligible. Window images are not captured; window titles are not used or stored.
 
 ## Troubleshooting
 
@@ -160,6 +160,8 @@ For 1.1.0, packaged translations, localized permission descriptions, regional se
 For 1.1.1, all 13 tests pass. The extracted universal release ZIP was checked for Developer ID signing, Hardened Runtime, and secure timestamps in both architectures, a valid attached notarization ticket, and Gatekeeper acceptance as `Notarized Developer ID`. The signed app launches on Apple Silicon with switching enabled, and both shortcuts register successfully. Intel runtime behavior and physical-key reverse/hold-Option cycling remain unverified.
 
 For 1.2.0, all 13 tests pass. The extracted universal release ZIP was checked for Developer ID signing, a valid attached notarization ticket, Gatekeeper acceptance as `Notarized Developer ID`, the bundled app icon, and its SHA-256 checksum. On macOS 27.0.1 / Apple Silicon, a separate AppKit test app with two temporary blank windows verified full-screen → desktop, desktop → full-screen, and full-screen → full-screen switching in both directions using the signed diagnostic executable. The target became the key window on the active Space, and full-screen windows stayed full-screen. Each diagnostic invocation started with a fresh switcher, also testing discovery without a prior window cache. Physical-key full-screen reverse/hold-Option cycling and multiple-monitor/Split View behavior remain unverified.
+
+For 1.2.1, a nonzero-layer regression was reproduced using two temporary blank AppKit windows, with the full-screen window on layer 3. The installed 1.2.0 diagnostic could switch from full-screen to desktop but reported no switch on the return. Removing the layer filter restored desktop → full-screen switching, and forward and backward round trips reached the target's active Space and key window while preserving full-screen mode. All 13 tests pass. The user also confirmed switching works after installing the fix. Diagnostic checks and physical-key delivery are separate evidence.
 
 Quit the running app before checking shortcut registration:
 

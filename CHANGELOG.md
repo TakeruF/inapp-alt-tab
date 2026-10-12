@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 — 2026-10-12
+
+- Include full-screen windows on nonzero WindowServer layers in discovery and cache validation, fixing desktop → full-screen switching for apps that use these layers.
+
 ## 1.2.0 — 2026-10-12
 
 - Add a macOS app icon to the application bundle and setup window.

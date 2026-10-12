@@ -181,8 +181,10 @@ private enum WindowSpaceActivation {
         let rows = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID)
             as? [[String: Any]] ?? []
         return Set(rows.compactMap { row in
-            guard row[kCGWindowOwnerPID as String] as? Int32 == pid,
-                  row[kCGWindowLayer as String] as? Int == 0 else { return nil }
+            // Full-screen windows can use a nonzero layer (for example, layer 3).
+            // Keep their IDs for discovery and cache validation; eligibility is
+            // determined from the AX role/subrole, not WindowServer stacking level.
+            guard row[kCGWindowOwnerPID as String] as? Int32 == pid else { return nil }
             return row[kCGWindowNumber as String] as? CGWindowID
         })
     }
