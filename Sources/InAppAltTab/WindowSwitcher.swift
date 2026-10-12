@@ -10,6 +10,9 @@ struct AccessibleWindow: Equatable {
 
 final class WindowSwitcher {
     private var cycle = WindowCycle<AccessibleWindow>()
+    private var discoveredWindows: [pid_t: [AXUIElement]] = [:]
+    private var discoveryCursor: [pid_t: UInt64] = [:]
+    private var discoveryTargets: [pid_t: Set<CGWindowID>] = [:]
     private let logger = Logger(subsystem: "dev.takeruf.inapp-alt-tab", category: "WindowSwitcher")
 
     init() {
@@ -38,11 +41,37 @@ final class WindowSwitcher {
             reset()
             return false
         }
-        var candidates = windows.filter(isSwitchable)
-        // Some apps omit the focused window from AXWindows, notably across Spaces.
-        if let focused, isSwitchable(focused), !candidates.contains(where: { CFEqual($0, focused) }) {
-            candidates.insert(focused, at: 0)
+        let ids = WindowSpaceActivation.windowIDs(pid: pid)
+        let remembered = (discoveredWindows[pid] ?? []).filter {
+            guard let id = WindowSpaceActivation.id(of: $0) else { return false }
+            return ids.contains(id)
         }
+        var observed: [AXUIElement] = []
+        for window in windows + remembered where !observed.contains(where: { CFEqual($0, window) }) {
+            observed.append(window)
+        }
+        // Some apps omit the focused window from AXWindows, notably across Spaces.
+        if let focused, !observed.contains(where: { CFEqual($0, focused) }) {
+            observed.insert(focused, at: 0)
+        }
+        let knownIDs = Set(observed.compactMap { WindowSpaceActivation.id(of: $0) })
+        let missing = ids.subtracting(knownIDs)
+        if discoveryTargets[pid] != missing {
+            discoveryCursor[pid] = 0
+            discoveryTargets[pid] = missing
+        }
+        if !missing.isEmpty {
+            var cursor = discoveryCursor[pid] ?? 0
+            observed += WindowSpaceActivation.discover(pid: pid, ids: missing, cursor: &cursor)
+            discoveryCursor[pid] = cursor
+        }
+        discoveredWindows[pid] = observed
+        let candidates = observed.filter(isSwitchable)
+        // Retain only live processes; AX elements must not accumulate after apps quit.
+        let running = Set(NSWorkspace.shared.runningApplications.map(\.processIdentifier))
+        discoveredWindows = discoveredWindows.filter { running.contains($0.key) }
+        discoveryCursor = discoveryCursor.filter { running.contains($0.key) }
+        discoveryTargets = discoveryTargets.filter { running.contains($0.key) }
         guard let target = cycle.next(owner: pid,
                                       windows: candidates.map { AccessibleWindow(element: $0) },
                                       focused: focused.map { AccessibleWindow(element: $0) },
@@ -69,6 +98,12 @@ final class WindowSwitcher {
         setIfWritable(window, kAXMainAttribute, kCFBooleanTrue)
         setIfWritable(window, kAXFocusedAttribute, kCFBooleanTrue)
         setIfWritable(application, kAXFocusedWindowAttribute, window)
+        // AXRaise changes the app's stacking order, but cannot enter another window's
+        // full-screen Space. Ask WindowServer to activate this particular window.
+        // This also handles returning from a full-screen window to a desktop window.
+        if let error = WindowSpaceActivation.activate(window, pid: pid), error != .success {
+            logger.error("Window Space activation failed: \(error.rawValue)")
+        }
         return true
     }
 
@@ -101,5 +136,95 @@ final class WindowSwitcher {
         guard AXUIElementIsAttributeSettable(element, attribute as CFString, &writable) == .success,
               writable.boolValue else { return }
         AXUIElementSetAttributeValue(element, attribute as CFString, value)
+    }
+}
+
+/// macOS has no public API for activating a specific window across Spaces.
+/// Resolve the optional system entry points at runtime so future OS changes leave
+/// ordinary Accessibility switching available instead of preventing app launch.
+private enum WindowSpaceActivation {
+    private typealias WindowID = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
+    private typealias Activate = @convention(c) (UnsafeMutablePointer<ProcessSerialNumber>, CGWindowID, UInt32) -> CGError
+    private typealias ProcessForPID = @convention(c) (pid_t, UnsafeMutablePointer<ProcessSerialNumber>) -> OSStatus
+    private typealias RemoteElement = @convention(c) (CFData) -> Unmanaged<AXUIElement>?
+
+    // Keep the handles open for the lifetime of the resolved function pointers.
+    private static let accessibility = dlopen(
+        "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", RTLD_LAZY)
+    private static let skyLight = dlopen(
+        "/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY)
+
+    private static let windowID: WindowID? = {
+        guard let accessibility, let symbol = dlsym(accessibility, "_AXUIElementGetWindow") else { return nil }
+        return unsafeBitCast(symbol, to: WindowID.self)
+    }()
+    private static let activateWindow: Activate? = {
+        guard let skyLight, let symbol = dlsym(skyLight, "_SLPSSetFrontProcessWithOptions") else { return nil }
+        return unsafeBitCast(symbol, to: Activate.self)
+    }()
+    private static let processForPID: ProcessForPID? = {
+        guard let accessibility, let symbol = dlsym(accessibility, "GetProcessForPID") else { return nil }
+        return unsafeBitCast(symbol, to: ProcessForPID.self)
+    }()
+    private static let remoteElement: RemoteElement? = {
+        guard let accessibility, let symbol = dlsym(accessibility, "_AXUIElementCreateWithRemoteToken") else { return nil }
+        return unsafeBitCast(symbol, to: RemoteElement.self)
+    }()
+
+    static func id(of window: AXUIElement) -> CGWindowID? {
+        guard let windowID else { return nil }
+        var id = CGWindowID(0)
+        return windowID(window, &id) == .success && id != 0 ? id : nil
+    }
+
+    static func windowIDs(pid: pid_t) -> Set<CGWindowID> {
+        let rows = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] ?? []
+        return Set(rows.compactMap { row in
+            guard row[kCGWindowOwnerPID as String] as? Int32 == pid,
+                  row[kCGWindowLayer as String] as? Int == 0 else { return nil }
+            return row[kCGWindowNumber as String] as? CGWindowID
+        })
+    }
+
+    /// AppKit omits other-Space windows from AXWindows. Resolve their AX roots
+    /// against WindowServer IDs, with a time budget and a cursor for sparse IDs.
+    static func discover(pid: pid_t, ids: Set<CGWindowID>, cursor: inout UInt64) -> [AXUIElement] {
+        guard let remoteElement, windowID != nil else { return [] }
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.12
+        var token = Data(count: 20)
+        withUnsafeBytes(of: pid) { token.replaceSubrange(0..<4, with: $0) }
+        var magic: UInt32 = 0x636f636f
+        withUnsafeBytes(of: &magic) { token.replaceSubrange(8..<12, with: $0) }
+        var remaining = ids
+        var found: [AXUIElement] = []
+        var attempts = 0
+        while ProcessInfo.processInfo.systemUptime < deadline, !remaining.isEmpty, attempts < 4096 {
+            attempts += 1
+            let next = cursor
+            cursor &+= 1
+            withUnsafeBytes(of: next) { token.replaceSubrange(12..<20, with: $0) }
+            guard let element = remoteElement(token as CFData)?.takeRetainedValue() else { continue }
+            AXUIElementSetMessagingTimeout(element, 0.01)
+            guard let id = id(of: element), remaining.contains(id),
+                  ProcessInfo.processInfo.systemUptime < deadline else { continue }
+            var role: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role) == .success,
+                  role as? String == kAXWindowRole else { continue }
+            found.append(element)
+            remaining.remove(id)
+        }
+        // Once resolved, future newly created windows may reuse low AX IDs.
+        if remaining.isEmpty { cursor = 0 }
+        return found
+    }
+
+    static func activate(_ window: AXUIElement, pid: pid_t) -> CGError? {
+        guard let activateWindow, let processForPID else { return nil }
+        guard let id = id(of: window) else { return nil }
+        var process = ProcessSerialNumber()
+        guard processForPID(pid, &process) == noErr else { return nil }
+        // 0x200 marks the request as a user initiated switch and raises only id.
+        return activateWindow(&process, id, 0x200)
     }
 }

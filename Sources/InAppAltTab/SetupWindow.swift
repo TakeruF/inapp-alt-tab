@@ -37,9 +37,12 @@ final class SetupWindow: NSWindowController {
     private func buildContent(_ window: NSWindow) {
         guard let content = window.contentView else { return }
         let image = NSImageView()
-        image.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: L10n.text(.windowIcon))
-        image.contentTintColor = .controlAccentColor
-        image.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 34, weight: .medium)
+        image.image = NSImage(named: NSImage.Name("AppIcon")) ?? NSImage(
+            systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: L10n.text(.windowIcon))
+        image.setAccessibilityLabel(L10n.text(.windowIcon))
+        image.imageScaling = .scaleProportionallyUpOrDown
+        image.widthAnchor.constraint(equalToConstant: 64).isActive = true
+        image.heightAnchor.constraint(equalToConstant: 64).isActive = true
         let title = NSTextField(wrappingLabelWithString: L10n.text(.setupTitle))
         title.font = .systemFont(ofSize: 20, weight: .semibold)
         let description = NSTextField(wrappingLabelWithString: L10n.text(.setupInstructions))

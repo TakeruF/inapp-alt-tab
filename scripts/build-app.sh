@@ -44,6 +44,7 @@ else
 fi
 cp Resources/Info.plist "$app/Contents/Info.plist"
 cp LICENSE "$app/Contents/Resources/LICENSE"
+cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
 ditto "$binary_dir/InAppAltTab_AppLocalization.bundle" "$app/Contents/Resources/InAppAltTab_AppLocalization.bundle"
 for localization in Resources/*.lproj; do
     ditto "$localization" "$app/Contents/Resources/$(basename "$localization")"

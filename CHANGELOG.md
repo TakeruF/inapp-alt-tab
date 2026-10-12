@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 — 2026-10-12
+
+- Add a macOS app icon to the application bundle and setup window.
+- Activate the selected window's Space when switching to or from a full-screen window, with Accessibility fallback if the optional system APIs are unavailable.
+- Discover and cache windows omitted from the current Space's Accessibility list with bounded traversal.
+
 ## 1.1.1 — 2026-10-12
 
 - Add Developer ID Application signing with Hardened Runtime and a secure timestamp for release builds.

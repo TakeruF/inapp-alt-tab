@@ -114,6 +114,7 @@ The window order stays stable while Option is held, even if raising a window cha
 - Only the frontmost application's normal windows are eligible.
 - Zero or one eligible window produces no window operation.
 - Minimized windows are included and restored when selected.
+- Full-screen windows and windows on other Spaces are included. Selecting one moves to its Space without leaving full-screen mode.
 - Switching is suspended while the focused window has a modal dialog or an attached sheet.
 - Command + Tab continues to work as usual.
 - The menu bar provides pause/resume, setup, launch at login, and quit controls.
@@ -123,13 +124,17 @@ The window order stays stable while Option is held, even if raising a window cha
 
 Applications must expose their windows through the macOS Accessibility API. In-app tabs are not separate windows. Tool palettes and dialog windows are excluded.
 
-Windows on other Spaces or in full-screen mode can only be switched if the application exposes them and macOS allows the Accessibility operation. Those configurations have not been verified.
+Cross-Space activation and discovery use optional, dynamically resolved macOS system APIs because public Accessibility raising alone does not enter a full-screen Space. Future macOS changes may disable that functionality; ordinary Accessibility switching remains available. Applications that do not expose usable Accessibility window elements may still be unsupported.
+
+Discovery of windows omitted from an application's current-Space Accessibility list is bounded to approximately 120 ms per shortcut, with a maximum of 4,096 element attempts and a short per-element IPC timeout. Found windows are cached and checked against current WindowServer window IDs. Apps with sparse Accessibility IDs may require another shortcut invocation before every window is discovered.
 
 ## Privacy and permissions
 
 Accessibility permission is used to enumerate and focus windows and observe Option-key release events. The app registers only its two shortcuts and observes modifier changes; it does not collect or save typed text or document contents.
 
 There are no previews, screenshots, screen recording, or network requests. Screen Recording permission is not needed. Local preferences store pause state and whether setup has been shown. Operational errors may be recorded in the macOS system log without window titles or document contents.
+
+WindowServer metadata is used only to match window IDs, process IDs, and window levels for cross-Space discovery. Window images are not captured; window titles are not used or stored.
 
 ## Troubleshooting
 
@@ -153,6 +158,8 @@ The app has been built and launched on macOS 27.0.1. Shortcut registration has b
 For 1.1.0, packaged translations, localized permission descriptions, regional selection, and English fallback were checked. Setup windows were visually checked in all five locales on Apple Silicon.
 
 For 1.1.1, all 13 tests pass. The extracted universal release ZIP was checked for Developer ID signing, Hardened Runtime, and secure timestamps in both architectures, a valid attached notarization ticket, and Gatekeeper acceptance as `Notarized Developer ID`. The signed app launches on Apple Silicon with switching enabled, and both shortcuts register successfully. Intel runtime behavior and physical-key reverse/hold-Option cycling remain unverified.
+
+For 1.2.0, all 13 tests pass. The extracted universal release ZIP was checked for Developer ID signing, a valid attached notarization ticket, Gatekeeper acceptance as `Notarized Developer ID`, the bundled app icon, and its SHA-256 checksum. On macOS 27.0.1 / Apple Silicon, a separate AppKit test app with two temporary blank windows verified full-screen → desktop, desktop → full-screen, and full-screen → full-screen switching in both directions using the signed diagnostic executable. The target became the key window on the active Space, and full-screen windows stayed full-screen. Each diagnostic invocation started with a fresh switcher, also testing discovery without a prior window cache. Physical-key full-screen reverse/hold-Option cycling and multiple-monitor/Split View behavior remain unverified.
 
 Quit the running app before checking shortcut registration:
 
@@ -182,7 +189,11 @@ Replace `ko` with `en`, `ja`, `zh-Hans`, or `zh-Hant`. The report includes the s
 
 The app uses Swift, AppKit, ApplicationServices, Carbon, and ServiceManagement. Global shortcuts are registered with Carbon. Accessibility windows are enumerated for the frontmost process and raised with `AXRaise`, followed by writable focus attributes. The frontmost process is checked again before acting.
 
+For windows outside the current Space, WindowServer IDs are matched to Accessibility window roots using a bounded remote-element traversal. `_SLPSSetFrontProcessWithOptions` activates the selected window's Space. The optional `_AXUIElementGetWindow`, `_AXUIElementCreateWithRemoteToken`, and WindowServer functions are loaded at runtime rather than linked as launch-time requirements. This technique was checked against [AltTab's Accessibility wrapper](https://github.com/lwouis/alt-tab-macos/blob/master/src/macos/api-wrappers/AXUIElement.swift) and [window activation implementation](https://github.com/lwouis/alt-tab-macos/blob/master/src/switcher/state/Window.swift).
+
 `WindowCycle` contains the window-order logic and its tests. `AppLocalization` contains native localized string resources and language-selection tests. The executable target contains shortcut handling, window operations, setup, and menu bar controls. `scripts/build-app.sh` creates and signs the app bundle and includes the license and all localization resources.
+
+The app icon master is `Resources/Icon/AppIcon.png`. Run `bash scripts/build-icon.sh` to regenerate its ICNS file; app builds package it automatically.
 
 ## Acknowledgments
 
